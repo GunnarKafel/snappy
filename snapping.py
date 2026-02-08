@@ -1,4 +1,5 @@
 import bpy
+from . import utility
 
 class ScaleGrid(bpy.types.Operator):
     """Scale the grid by an amount"""
@@ -13,24 +14,33 @@ class ScaleGrid(bpy.types.Operator):
         return {'FINISHED'}
 
 def draw_header(self, context):
+    if not context.scene.tool_settings.use_snap:
+        return
+    
     layout: bpy.types.UILayout = self.layout
     layout = layout.box();
-    layout.emboss = "PULLDOWN_MENU"
+    # layout.emboss = "PULLDOWN_MENU"
 
     row = layout.row(align=True)
-    row.ui_units_x -= 42;
-    
+    row.scale_x = 0
+
+    formatted_scale = f"{context.space_data.overlay.grid_scale:.3f}"
+    formatted_scale = formatted_scale.rstrip('0').rstrip('.')
+    row.label(text=f"{formatted_scale}{utility.unit()}".rjust(10), translate=False)
+
     decrement = row.operator(operator=ScaleGrid.bl_idname, text="", icon='REMOVE')
     decrement.scale = 0.5;
-    
-    row.scale_x = -1.25
-    row.prop(context.space_data.overlay, "grid_scale", text="", expand=False, emboss=False, slider=True)
 
-    row.scale_x = 0
     increment = row.operator(operator=ScaleGrid.bl_idname, text="", icon='ADD')
     increment.scale = 2;
 
 _addon_keymaps = []
+
+def add_scale_keymap(keymaps, key, scale):
+    kmi = keymaps.keymap_items.new(ScaleGrid.bl_idname, key, 'PRESS', shift=False)
+    kmi.properties.scale = scale
+    return kmi
+
 
 def enable():
     bpy.utils.register_class(ScaleGrid)
@@ -39,15 +49,15 @@ def enable():
     wm = bpy.context.window_manager
     kc = wm.keyconfigs.addon
 
+    # Only way to make this work is to have two separate keymaps?
     if kc:
         km = kc.keymaps.new(name='Object Mode', region_type='WINDOW')
-        kmi = km.keymap_items.new(ScaleGrid.bl_idname, 'RIGHT_BRACKET', 'PRESS', shift=False)
-        kmi.properties.scale = 2
-        _addon_keymaps.append((km, kmi))
+        _addon_keymaps.append((km, add_scale_keymap(km, 'RIGHT_BRACKET', 2)))
+        _addon_keymaps.append((km, add_scale_keymap(km, 'LEFT_BRACKET', 0.5)))
 
-        kmi = km.keymap_items.new(ScaleGrid.bl_idname, 'LEFT_BRACKET', 'PRESS', shift=False)
-        kmi.properties.scale = 0.5
-        _addon_keymaps.append((km, kmi))
+        km = kc.keymaps.new(name='Mesh', region_type='WINDOW')
+        _addon_keymaps.append((km, add_scale_keymap(km, 'RIGHT_BRACKET', 2)))
+        _addon_keymaps.append((km, add_scale_keymap(km, 'LEFT_BRACKET', 0.5)))
 
 def disable():
     for km, kmi in _addon_keymaps:

@@ -1,11 +1,12 @@
 """Dimensions overlay for meshes and objects"""
 
 import bpy
-import blf
+import bmesh
 import mathutils
+from gpu_extras.batch import batch_for_shader
 from bpy_extras.view3d_utils import location_3d_to_region_2d
-
-_text_draw_handle = None
+from collections import defaultdict
+from . import draw, utility
 
 def get_bounds(obj):
     depsgraph = bpy.context.evaluated_depsgraph_get()
@@ -13,98 +14,239 @@ def get_bounds(obj):
 
     return [eval_obj.matrix_world @ mathutils.Vector(corner) for corner in eval_obj.bound_box]
 
-def view_camera_position(rv3d):
-    return rv3d.view_matrix.inverted().translation
+def get_edges_axis_aligned(points, axis='Z'):
+    idx = {'X': 0, 'Y': 1, 'Z': 2}[axis]
+    other = [0, 1, 2]
+    other.remove(idx)
 
-def axis_face_centers_minmax(bounds):
-    xs = [v.x for v in bounds]
-    ys = [v.y for v in bounds]
-    zs = [v.z for v in bounds]
+    groups = {}
+    for p in points:
+        key = (round(p[other[0]], 6), round(p[other[1]], 6))
+        groups.setdefault(key, []).append(p)
 
-    min_x, max_x = min(xs), max(xs)
-    min_y, max_y = min(ys), max(ys)
-    min_z, max_z = min(zs), max(zs)
+    edges = []
+    for g in groups.values():
+        g.sort(key=lambda p: p[idx])
+        edges.append((g[0], g[1]))
 
-    cx = (min_x + max_x) * 0.5
-    cy = (min_y + max_y) * 0.5
-    cz = (min_z + max_z) * 0.5
+    return edges
 
+def expand_bounds_aabb(points, amount):
+    min_v = mathutils.Vector((
+        min(p.x for p in points),
+        min(p.y for p in points),
+        min(p.z for p in points),
+    ))
+    max_v = mathutils.Vector((
+        max(p.x for p in points),
+        max(p.y for p in points),
+        max(p.z for p in points),
+    ))
+
+    min_v -= mathutils.Vector((amount, amount, amount))
+    max_v += mathutils.Vector((amount, amount, amount))
+
+    return [
+        mathutils.Vector((x, y, z))
+        for x in (min_v.x, max_v.x)
+        for y in (min_v.y, max_v.y)
+        for z in (min_v.z, max_v.z)
+    ]
+
+def get_axis(bounds, rv3d, growth): 
+    cam_pos = rv3d.view_matrix.inverted().translation
+    bounds = expand_bounds_aabb(bounds, growth)
+
+    region = bpy.context.region
+    rv3d = bpy.context.space_data.region_3d
+
+    def closest(candidates):
+        return min(candidates, key=lambda p: (p - cam_pos).length_squared)
+
+    def axis_edge(axis, direction):
+        outEdge = None
+        for edge in get_edges_axis_aligned(bounds, axis):
+            # Assign edge to first
+            if outEdge is None:
+                outEdge = edge
+                continue
+
+            half = mathutils.Vector.lerp(edge[0], edge[1], 0.5);
+            oldHalf = mathutils.Vector.lerp(outEdge[0], outEdge[1], 0.5)
+            
+            if direction != None:
+                if direction == 'DOWN':
+                    if half.z > oldHalf.z:
+                        continue
+                
+            if closest([half,oldHalf]) == half:
+                outEdge = edge
+
+        return outEdge
+    
+    def z_most_right_edge():
+        outEdge = None
+        for edge in get_edges_axis_aligned(bounds, 'Z'):
+            if outEdge is None:
+                outEdge = edge
+                continue
+
+            half = mathutils.Vector.lerp(edge[0], edge[1], 0.5)
+            oldHalf = mathutils.Vector.lerp(outEdge[0], outEdge[1], 0.5)
+
+            # Convert 3D points to 2D region coordinates
+            half_2d = location_3d_to_region_2d(region, rv3d, half)
+            oldHalf_2d = location_3d_to_region_2d(region, rv3d, oldHalf)
+
+            # If projection failed, skip
+            if half_2d is None or oldHalf_2d is None:
+                continue
+
+            # Compare X screen coordinates
+            if half_2d.x > oldHalf_2d.x:
+                outEdge = edge
+
+        return outEdge
+
+    
     return {
-        'X': (
-            mathutils.Vector((min_x, cy, cz)),
-            mathutils.Vector((max_x, cy, cz)),
-        ),
-        'Y': (
-            mathutils.Vector((cx, min_y, cz)),
-            mathutils.Vector((cx, max_y, cz)),
-        ),
-        'Z': (
-            mathutils.Vector((cx, cy, min_z)),
-            mathutils.Vector((cx, cy, max_z)),
-        ),
+        'X': axis_edge('X', 'DOWN'),
+        'Y': axis_edge('Y', 'DOWN'),
+        'Z': z_most_right_edge()
     }
 
-def closest_faces_to_camera(bounds, rv3d):
-    cam_pos = view_camera_position(rv3d)
-    faces = axis_face_centers_minmax(bounds)
+def label_offset(start, end, cam, distance = 0.3):
+    middle = mathutils.Vector.lerp(start, end, 0.5)
+    direction = (end - start).normalized()
+    to_cam = (cam - middle).normalized()
+    offset_dir = direction.cross(to_cam).normalized()
+    return middle + offset_dir * distance
 
-    result = {}
-    for axis, (a, b) in faces.items():
-        da = (a - cam_pos).length_squared
-        db = (b - cam_pos).length_squared
-        result[axis] = a if da < db else b
 
-    return result
-
-def draw_text(font_id, screen_pos, text, color, font_size):
-    w, h = blf.dimensions(font_id, text)
-
-    blf.size(font_id, font_size)
-    blf.color(font_id, color[0], color[1], color[2], 1)
-    blf.position(font_id, screen_pos.x - w * 0.5, screen_pos.y - h * 0.5, 0)
-
-    blf.draw(font_id, text)
-
-def draw_object_label():
+def edit_mode_overlay():
     context = bpy.context
-    region = context.region
     rv3d = context.region_data
+    cam_pos = rv3d.view_matrix.inverted().translation
+
+    obj = context.edit_object
+    mesh = obj.data
+
+    mw = obj.matrix_world
+
+    bm = bmesh.from_edit_mesh(mesh)
+    selected_edges = set()
+    for e in bm.edges:
+        if e.select:
+            selected_edges.add(e)
+            for v in e.verts:
+                for linked_e in v.link_edges:
+                    selected_edges.add(linked_e)
+
+    for edge in selected_edges:
+        v1, v2 = edge.verts
+        start = mathutils.Vector(mw @ v1.co)
+        end = mathutils.Vector(mw @ v2.co)
+
+        length = edge.calc_length()
+        unit = utility.unit()
+        formatted = f"{length:.2f}"
+        formatted = formatted.rstrip('0').rstrip('.')
+
+        color = (1, 1, 1, 1)
+        font_size = 12
+        
+        if not edge.select: # surrounding verts
+            color = (1, 1, 1, 0.5)
+            font_size = 10
+        
+        draw.text(label_offset(start, end, cam_pos, 0.05), f"{formatted}{unit}", color, font_size)
+
+def object_mode_overlay():
+    context = bpy.context
+    rv3d = context.region_data
+
+    if len(context.selected_objects) == 0:
+        return
 
     obj = context.active_object
     if not obj:
         return
 
+    growth_amount = 0.1
+    cam_pos = rv3d.view_matrix.inverted().translation
     bounds = get_bounds(obj)
-    faces = closest_faces_to_camera(bounds, rv3d)
+    edges = get_axis(bounds, rv3d, growth_amount)
     dims = obj.dimensions
 
+    unit = utility.unit()
     ui = bpy.context.preferences.themes[0].user_interface
-    color = {
+    theme = {
         'X': ui.axis_x,
         'Y': ui.axis_y,
         'Z': ui.axis_z
     }
 
-    for axis, world_pos in faces.items():
-        screen_pos = location_3d_to_region_2d(region, rv3d, world_pos)
-        if not screen_pos:
-            continue
+    for axis, edge in edges.items():
+        formatted = f"{getattr(dims, axis.lower()):.2f}"
+        formatted = formatted.rstrip('0').rstrip('.')
+
+        start = mathutils.Vector(edge[0])
+        end = mathutils.Vector(edge[1])
+
+        if axis != 'Z':
+            start.z += growth_amount
+            end.z += growth_amount
+
+        direction = (end - start).normalized()
+        start += direction * growth_amount
+        end -= direction * growth_amount
         
-        font_id = 0
-        font_size = 12
-        text = f"{axis.lower()}: {getattr(dims, axis.lower()):.2f}"
+        text = f"{axis.lower()}: {formatted}{unit}"
+        draw.text(label_offset(start, end, cam_pos), text, (1,1,1,1), 12)
         
-        draw_text(font_id, screen_pos, text, color[axis], font_size);
+        draw.lines([start, end], theme[axis])
+        
+# Registration
+
+_draw_post_pixel = None
+def draw_post_pixel():
+    """Used for drawing screen space text"""
+    pass
+
+_draw_post_view = None
+def draw_post_view():
+    """Used for drawing meshes"""
+
+    mode = bpy.context.object.mode;
+    
+    if mode == 'OBJECT':
+        object_mode_overlay()
+    elif mode == 'EDIT':
+        edit_mode_overlay()
 
 def enable():
-    global _text_draw_handle
-    if _text_draw_handle is None:
-        _text_draw_handle = bpy.types.SpaceView3D.draw_handler_add(
-            draw_object_label, (), 'WINDOW', 'POST_PIXEL'
-        )
+    view_3d = bpy.types.SpaceView3D
+    
+    global _draw_post_view
+    global _draw_post_pixel
+
+    if _draw_post_view is None:
+        _draw_post_view = view_3d.draw_handler_add(draw_post_view, (), 'WINDOW', 'POST_VIEW')
+
+    if _draw_post_pixel is None:
+        _draw_post_pixel = view_3d.draw_handler_add(draw_post_pixel, (), 'WINDOW', 'POST_PIXEL')
+
 
 def disable():
-    global _text_draw_handle
-    if _text_draw_handle:
-        bpy.types.SpaceView3D.draw_handler_remove(_text_draw_handle, 'WINDOW')
-        _text_draw_handle = None
+    view_3d = bpy.types.SpaceView3D
+
+    global _draw_post_view
+    global _draw_post_pixel
+
+    if _draw_post_view:
+        view_3d.draw_handler_remove(_draw_post_view, 'WINDOW')
+        _draw_post_view = None
+
+    if _draw_post_pixel:
+        view_3d.draw_handler_remove(_draw_post_pixel, 'WINDOW')
+        _draw_post_pixel = None
