@@ -1,19 +1,6 @@
 # Make sure to register all modules that way they refresh 
-from . import (
-    dimensions,
-    pivot,
-    snapping,
-    draw,
-    utility
-)
-
-modules = [
-    dimensions,
-    pivot,
-    snapping,
-    draw, 
-    utility
-]
+from . import (dimensions, snapping, draw, utility, nudging)
+modules = [dimensions, snapping, draw, utility, nudging]
 
 def hot_reload():
     import importlib
