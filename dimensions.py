@@ -31,6 +31,9 @@ def get_edges_axis_aligned(points, axis='Z'):
 
     return edges
 
+def overlay_enabled(ctx) -> bool:
+    pass
+
 def expand_bounds_aabb(points, amount):
     min_v = mathutils.Vector((
         min(p.x for p in points),
@@ -233,15 +236,28 @@ _draw_post_view = None
 def draw_post_view():
     """Used for drawing meshes"""
 
-    mode = bpy.context.object.mode;
+    if bpy.context.object == None:
+        return
+
+    if bpy.context.space_data.overlay.show_overlays == False:
+        return 
+
+    mode = bpy.context.object.mode
     
     if mode == 'OBJECT':
         object_mode_overlay()
     elif mode == 'EDIT':
         edit_mode_overlay()
 
+def draw_overlay_ui(self, context):
+    layout: bpy.types.UILayout = self.layout
+    layout.label(text="Snappy")
+
 def enable():
     view_3d = bpy.types.SpaceView3D
+    view_overlay = bpy.types.VIEW3D_PT_overlay
+
+    view_overlay.append(draw_overlay_ui)
     
     global _draw_post_view
     global _draw_post_pixel
@@ -255,6 +271,9 @@ def enable():
 
 def disable():
     view_3d = bpy.types.SpaceView3D
+    view_overlay = bpy.types.VIEW3D_PT_overlay
+
+    view_overlay.remove(draw_overlay_ui)
 
     global _draw_post_view
     global _draw_post_pixel

@@ -1,12 +1,23 @@
 # Make sure to register all modules that way they refresh 
-from . import (dimensions, snapping, draw, utility)
-modules = [dimensions, snapping, draw, utility]
+from . import (
+    dimensions,
+    pivot,
+    snapping,
+    draw,
+    utility
+)
+
+modules = [
+    dimensions,
+    pivot,
+    snapping,
+    draw, 
+    utility
+]
 
 def hot_reload():
-    # Refresh submodules during development
     import importlib
     for module in modules:
-        print("Reloading module", module)
         importlib.reload(module)
 
 def register():
