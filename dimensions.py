@@ -262,7 +262,7 @@ def draw_post_view():
 
 def draw_overlay_ui(self, context):
     layout: bpy.types.UILayout = self.layout
-    layout.label(text="Snappy")
+    layout.label(text="Measurement")
     
     props = context.scene.overlay_settings
     row = layout.row()
