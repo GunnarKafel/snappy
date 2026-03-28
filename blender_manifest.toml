@@ -13,4 +13,5 @@ license = [
   "SPDX:GPL-3.0-or-later",
 ]
 
+website = "https://korvemaa.dev/projects/snappy"
 blender_version_min = "4.2.0"
