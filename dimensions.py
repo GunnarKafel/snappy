@@ -3,9 +3,7 @@
 import bpy
 import bmesh
 import mathutils
-from gpu_extras.batch import batch_for_shader
 from bpy_extras.view3d_utils import location_3d_to_region_2d
-from collections import defaultdict
 from . import draw, utility
 
 class DimensionOverlaySettings(bpy.types.PropertyGroup):
@@ -57,15 +55,16 @@ def expand_bounds_aabb(points, amount):
         for z in (min_v.z, max_v.z)
     ]
 
-def get_axis(bounds, rv3d, growth): 
+def get_axis(bounds, region, rv3d, growth): 
     cam_pos = rv3d.view_matrix.inverted().translation
     bounds = expand_bounds_aabb(bounds, growth)
 
-    region = bpy.context.region
-    rv3d = bpy.context.space_data.region_3d
-
     def closest(candidates):
         return min(candidates, key=lambda p: (p - cam_pos).length_squared)
+
+    def midpoint_2d(edge):
+        midpoint = mathutils.Vector.lerp(edge[0], edge[1], 0.5)
+        return location_3d_to_region_2d(region, rv3d, midpoint)
 
     def axis_edge(axis, direction):
         outEdge = None
@@ -75,15 +74,19 @@ def get_axis(bounds, rv3d, growth):
                 outEdge = edge
                 continue
 
-            half = mathutils.Vector.lerp(edge[0], edge[1], 0.5);
+            half = mathutils.Vector.lerp(edge[0], edge[1], 0.5)
             oldHalf = mathutils.Vector.lerp(outEdge[0], outEdge[1], 0.5)
             
-            if direction != None:
+            if direction is not None:
                 if direction == 'DOWN':
-                    if half.z > oldHalf.z:
+                    half_2d = location_3d_to_region_2d(region, rv3d, half)
+                    oldHalf_2d = location_3d_to_region_2d(region, rv3d, oldHalf)
+
+                    # In screen space, smaller Y is visually lower.
+                    if half_2d is not None and oldHalf_2d is not None and half_2d.y > oldHalf_2d.y:
                         continue
                 
-            if closest([half,oldHalf]) == half:
+            if closest([half, oldHalf]) == half:
                 outEdge = edge
 
         return outEdge
@@ -95,12 +98,8 @@ def get_axis(bounds, rv3d, growth):
                 outEdge = edge
                 continue
 
-            half = mathutils.Vector.lerp(edge[0], edge[1], 0.5)
-            oldHalf = mathutils.Vector.lerp(outEdge[0], outEdge[1], 0.5)
-
-            # Convert 3D points to 2D region coordinates
-            half_2d = location_3d_to_region_2d(region, rv3d, half)
-            oldHalf_2d = location_3d_to_region_2d(region, rv3d, oldHalf)
+            half_2d = midpoint_2d(edge)
+            oldHalf_2d = midpoint_2d(outEdge)
 
             # If projection failed, skip
             if half_2d is None or oldHalf_2d is None:
@@ -123,7 +122,16 @@ def label_offset(start, end, cam, distance = 0.3):
     middle = mathutils.Vector.lerp(start, end, 0.5)
     direction = (end - start).normalized()
     to_cam = (cam - middle).normalized()
-    offset_dir = direction.cross(to_cam).normalized()
+    offset_dir = direction.cross(to_cam)
+
+    # If vectors are nearly parallel, choose a stable fallback normal.
+    if offset_dir.length_squared < 1e-12:
+        fallback = mathutils.Vector((0.0, 0.0, 1.0))
+        if abs(direction.dot(fallback)) > 0.95:
+            fallback = mathutils.Vector((1.0, 0.0, 0.0))
+        offset_dir = direction.cross(fallback)
+
+    offset_dir.normalize()
     return middle + offset_dir * distance
 
 TRANSFORM_PREFIXES = (
@@ -172,7 +180,8 @@ def edit_mode_overlay():
         start = mathutils.Vector(mw @ v1.co)
         end = mathutils.Vector(mw @ v2.co)
 
-        length = edge.calc_length()
+        # Use world-space distance so overlay respects object scale.
+        length = (end - start).length
         unit = utility.unit()
         formatted = f"{length:.2f}"
         formatted = formatted.rstrip('0').rstrip('.')
@@ -184,7 +193,7 @@ def edit_mode_overlay():
             color = (1, 1, 1, 0.5)
             font_size = 10
         
-        draw.text(label_offset(start, end, cam_pos, 0.05), f"{formatted}{unit}", color, font_size)
+        draw.text_3d(label_offset(start, end, cam_pos, 0.05), f"{formatted}{unit}", color, font_size)
 
 def object_mode_overlay():
     # Dimension overlay   
@@ -205,7 +214,7 @@ def object_mode_overlay():
     growth_amount = 0.1
     cam_pos = rv3d.view_matrix.inverted().translation
     bounds = get_bounds(obj)
-    edges = get_axis(bounds, rv3d, growth_amount)
+    edges = get_axis(bounds, context.region, rv3d, growth_amount)
     dims = obj.dimensions
 
     unit = utility.unit()
@@ -232,7 +241,7 @@ def object_mode_overlay():
         end -= direction * growth_amount
         
         text = f"{axis.lower()}: {formatted}{unit}"
-        draw.text(label_offset(start, end, cam_pos), text, (1,1,1,1), 12)
+        draw.text_3d(label_offset(start, end, cam_pos), text, (1,1,1,1), 12)
         
         draw.lines([start, end], theme[axis])
         
@@ -290,7 +299,7 @@ def enable():
 
 def disable():
     del bpy.types.Scene.overlay_settings
-    bpy.utils.register_class(DimensionOverlaySettings)
+    bpy.utils.unregister_class(DimensionOverlaySettings)
 
     view_3d = bpy.types.SpaceView3D
     view_overlay = bpy.types.VIEW3D_PT_overlay

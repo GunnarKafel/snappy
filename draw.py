@@ -6,6 +6,37 @@ import gpu
 import blf
 from gpu_extras.batch import batch_for_shader
 
+def pixel_instruction(draw):
+    global _inside_pixel_scope
+    
+    if _inside_pixel_scope:
+        draw()
+        return
+    
+    _post_pixel_instructions.append(draw)
+
+def view_instruction(draw):
+    global _inside_view_scope
+    
+    if _inside_view_scope:
+        draw()
+        return
+
+    _post_view_instructions.append(draw)
+
+def rect_2d(x, y, w, h, color = (0.1, 0.1, 0.1, 0.5)):
+    def draw():
+        shader = gpu.shader.from_builtin('UNIFORM_COLOR')
+        verts = [(x,y), (x+w,y), (x+w,y+h), (x,y+h)]
+        batch = batch_for_shader(shader, 'TRI_FAN', {"pos": verts})
+
+        gpu.state.blend_set('ALPHA')
+        shader.bind()
+        shader.uniform_float("color", color)
+        batch.draw(shader)
+        gpu.state.blend_set('NONE')
+    pixel_instruction(draw)
+
 def points(points: list[(float, float, float)], color = (1, 0, 0, 1), size= 4.5):
     def draw():
         shader = gpu.shader.from_builtin('POINT_UNIFORM_COLOR')
@@ -17,7 +48,7 @@ def points(points: list[(float, float, float)], color = (1, 0, 0, 1), size= 4.5)
         gpu.state.point_size_set(size)
 
         batch.draw(shader)
-    _post_view_instructions.append(draw)
+    view_instruction(draw)
 
 def lines(points: list[(float, float, float)], color = (1, 1, 0, 1), width = 1):
     def draw():
@@ -30,7 +61,7 @@ def lines(points: list[(float, float, float)], color = (1, 1, 0, 1), width = 1):
         shader.uniform_float("color", color)
 
         batch.draw(shader)
-    _post_view_instructions.append(draw)
+    view_instruction(draw)
 
 def box(min, max, color = (1, 1, 0, 1), width = 1):
     def draw():
@@ -55,9 +86,15 @@ def box(min, max, color = (1, 1, 0, 1), width = 1):
         shader.uniform_float("lineWidth",width)
         shader.uniform_float("color", color)
         batch.draw(shader)
-    _post_view_instructions.append(draw)
+    view_instruction(draw)
 
-def text(point, text: str, color = (1, 1, 1, 1), size = 14):
+def text_2d(point, text:str, color = (1,1,1,1), size = 14):
+    def draw():
+        pass
+    pixel_instruction(draw)
+    
+
+def text_3d(point, text: str, color = (1, 1, 1, 1), size = 14, padding = 4, background_color = (0.1, 0.1, 0.1, 0.5)):
     def draw():
         context = bpy.context
         region = context.region
@@ -66,13 +103,25 @@ def text(point, text: str, color = (1, 1, 1, 1), size = 14):
         screen_pos = location_3d_to_region_2d(region, rv3d, point)
         if not screen_pos:
             return
-
+        
         font_id = 0
+        blf.size(font_id, size)
         w, h = blf.dimensions(font_id, text)
 
-        blf.size(font_id, size)
+        text_x = screen_pos.x - w * 0.5
+        text_y = screen_pos.y - h * 0.5
+
+        if background_color is not None:
+            rect_2d(
+                text_x - padding,
+                text_y - padding,
+                w + padding * 2,
+                h + padding * 2,
+                background_color,
+            )
+
         blf.color(font_id, color[0], color[1], color[2], color[3])
-        blf.position(font_id, screen_pos.x - w * 0.5, screen_pos.y - h * 0.5, 0)
+        blf.position(font_id, text_x, text_y, 0)
         
         blf.enable(0, blf.SHADOW)
         blf.shadow(0, 6, 0, 0, 0, 0.6)
@@ -80,24 +129,43 @@ def text(point, text: str, color = (1, 1, 1, 1), size = 14):
         blf.draw(font_id, text)
 
         blf.disable(0, blf.SHADOW)
-    _post_pixel_instructions.append(draw)
+    pixel_instruction(draw)
 
-_post_pixel_instructions = list()
+_post_pixel_instructions = None
+_inside_pixel_scope = False
 _draw_post_pixel = None
+
 def draw_post_pixel():
     """Used for drawing screen space text"""
+    global _post_pixel_instructions
+    global _inside_pixel_scope
+    
+    _inside_pixel_scope = True
     while len(_post_pixel_instructions) > 0:
         _post_pixel_instructions.pop()()
+    _inside_pixel_scope = False
 
-_post_view_instructions = list()
+_post_view_instructions = None
+_inside_view_scope = False
 _draw_post_view = None
 def draw_post_view():
     """Used for drawing meshes"""
+    global _post_view_instructions
+    global _inside_view_scope
+    
+    _inside_view_scope = True
     while len(_post_view_instructions) > 0:
         _post_view_instructions.pop()()
+    _inside_view_scope = False
 
 def enable():
     view_3d = bpy.types.SpaceView3D
+
+    global _post_view_instructions
+    global _post_pixel_instructions
+
+    _post_view_instructions = list()
+    _post_pixel_instructions = list()
     
     global _draw_post_view
     if _draw_post_view is None:
@@ -109,6 +177,12 @@ def enable():
 
 
 def disable():
+    global _post_view_instructions
+    global _post_pixel_instructions
+
+    del _post_view_instructions
+    del _post_pixel_instructions
+
     global _draw_post_view
     global _draw_post_pixel
 

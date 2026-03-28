@@ -17,7 +17,7 @@ class GridPresetsMenu(bpy.types.Menu):
     bl_idname = "VIEW3D_MT_grid_presets"
     bl_label = "Presets"
 
-    snap_values = [0.25, 0.5, 1, 2, 4, 8, 16, 32]
+    snap_values = [0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64, 128, 256]
 
     def draw(self, context):
         layout = self.layout

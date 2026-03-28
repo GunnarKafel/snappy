@@ -2,17 +2,12 @@
 import bpy
 from . import snapping, pivot, utility
 
-def draw_VIEW3D_HT_header(self, context):
-    layout: bpy.types.UILayout = self.layout
-    layout = layout.box()
-
-    row = layout.row(align=True)
-    # row.popover(panel=pivot.OriginSelectPanel.bl_idname, text="", icon="OBJECT_ORIGIN")
-
+def draw_grid_ui(layout, context):
     formatted_scale = f"{context.space_data.overlay.grid_scale:.3f}"
     formatted_scale = formatted_scale.rstrip('0').rstrip('.')
     grid_text = f"{formatted_scale}{utility.unit()}"
 
+    row = layout.row(align=True)
     row.ui_units_x = 5
     row.menu(menu=snapping.GridPresetsMenu.bl_idname, text=grid_text, translate=False, icon='NONE')
 
@@ -22,8 +17,22 @@ def draw_VIEW3D_HT_header(self, context):
     increment = row.operator(operator=snapping.ScaleGrid.bl_idname, text="", icon='ADD')
     increment.scale = 2
 
+
+def draw_after_VIEW3D_HT_header(self, context):
+    """Rendered on the right side of the View3D header"""
+    layout: bpy.types.UILayout = self.layout
+
+    layout = layout.box()
+    draw_grid_ui(layout, context)
+
+def draw_before_VIEW3D_HT_header(self, context):
+    """Rendered on the left side of the View3D header"""
+    pass
+
 def enable():
-    bpy.types.VIEW3D_HT_header.append(draw_VIEW3D_HT_header)
+    bpy.types.VIEW3D_HT_header.append(draw_after_VIEW3D_HT_header)
+    bpy.types.VIEW3D_HT_header.prepend(draw_before_VIEW3D_HT_header)
 
 def disable():
-    bpy.types.VIEW3D_HT_header.remove(draw_VIEW3D_HT_header)
+    bpy.types.VIEW3D_HT_header.remove(draw_after_VIEW3D_HT_header)
+    bpy.types.VIEW3D_HT_header.remove(draw_before_VIEW3D_HT_header)
