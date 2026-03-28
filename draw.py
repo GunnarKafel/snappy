@@ -131,7 +131,7 @@ def text_3d(point, text: str, color = (1, 1, 1, 1), size = 14, padding = 4, back
         blf.disable(0, blf.SHADOW)
     pixel_instruction(draw)
 
-_post_pixel_instructions = None
+_post_pixel_instructions = list()
 _inside_pixel_scope = False
 _draw_post_pixel = None
 
@@ -145,7 +145,7 @@ def draw_post_pixel():
         _post_pixel_instructions.pop()()
     _inside_pixel_scope = False
 
-_post_view_instructions = None
+_post_view_instructions = list()
 _inside_view_scope = False
 _draw_post_view = None
 def draw_post_view():
