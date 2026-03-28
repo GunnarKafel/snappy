@@ -1,11 +1,17 @@
 import bpy
 
-def draw_header(self, context):
-    layout: bpy.types.UILayout = self.layout
-    layout.popover("VIEW3D_PT_snapping", text="Origin")
+class OriginSelectPanel(bpy.types.Panel):
+    bl_idname = "VIEW3D_PT_origin_select"
+    bl_label = "Select Origin"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'WINDOW'
+    bl_options = {"INSTANCED"}
+
+    def draw(self, context):
+        self.layout.label(text="Origin Select")
 
 def enable():
-    bpy.types.VIEW3D_HT_tool_header.append(draw_header)
+    bpy.utils.register_class(OriginSelectPanel)
 
 def disable():
-    bpy.types.VIEW3D_HT_tool_header.remove(draw_header)
+    bpy.utils.unregister_class(OriginSelectPanel)

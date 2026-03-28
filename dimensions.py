@@ -8,6 +8,10 @@ from bpy_extras.view3d_utils import location_3d_to_region_2d
 from collections import defaultdict
 from . import draw, utility
 
+class DimensionOverlaySettings(bpy.types.PropertyGroup):
+    enable_edge_length: bpy.props.BoolProperty(name="Show Edge Length", description="Show the length of selected edges in the 3d viewport.", default=True)
+    enable_dimensions: bpy.props.BoolProperty(name="Show Dimensions", description="Show the dimension/bounds length of the selected object.", default=True) 
+
 def get_bounds(obj):
     depsgraph = bpy.context.evaluated_depsgraph_get()
     eval_obj = obj.evaluated_get(depsgraph)
@@ -30,9 +34,6 @@ def get_edges_axis_aligned(points, axis='Z'):
         edges.append((g[0], g[1]))
 
     return edges
-
-def overlay_enabled(ctx) -> bool:
-    pass
 
 def expand_bounds_aabb(points, amount):
     min_v = mathutils.Vector((
@@ -139,6 +140,11 @@ def is_editing_mesh ():
     return False
 
 def edit_mode_overlay():
+    # Edge Length overlay
+
+    if bpy.context.scene.overlay_settings.enable_edge_length == False:
+        return;
+    
     context = bpy.context
     rv3d = context.region_data
     cam_pos = rv3d.view_matrix.inverted().translation
@@ -181,6 +187,11 @@ def edit_mode_overlay():
         draw.text(label_offset(start, end, cam_pos, 0.05), f"{formatted}{unit}", color, font_size)
 
 def object_mode_overlay():
+    # Dimension overlay   
+
+    if bpy.context.scene.overlay_settings.enable_dimensions == False:
+        return;
+
     context = bpy.context
     rv3d = context.region_data
 
@@ -252,8 +263,16 @@ def draw_post_view():
 def draw_overlay_ui(self, context):
     layout: bpy.types.UILayout = self.layout
     layout.label(text="Snappy")
+    
+    props = context.scene.overlay_settings
+    row = layout.row()
+    row.prop(props, "enable_dimensions", text="Dimensions")
+    row.prop(props, "enable_edge_length", text="Edge Length")
 
 def enable():
+    bpy.utils.register_class(DimensionOverlaySettings)
+    bpy.types.Scene.overlay_settings = bpy.props.PointerProperty(type=DimensionOverlaySettings)
+
     view_3d = bpy.types.SpaceView3D
     view_overlay = bpy.types.VIEW3D_PT_overlay
 
@@ -270,6 +289,9 @@ def enable():
 
 
 def disable():
+    del bpy.types.Scene.overlay_settings
+    bpy.utils.register_class(DimensionOverlaySettings)
+
     view_3d = bpy.types.SpaceView3D
     view_overlay = bpy.types.VIEW3D_PT_overlay
 

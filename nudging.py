@@ -91,7 +91,6 @@ def define_nudge_keymap(km, key, option):
 
 def enable():
     bpy.utils.register_class(NudgeSelected)
-    print("Registered Nudge class")
 
     wm = bpy.context.window_manager
     kc = wm.keyconfigs.addon

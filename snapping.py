@@ -27,26 +27,6 @@ class GridPresetsMenu(bpy.types.Menu):
             op.data_path = "space_data.overlay.grid_scale"
             op.value = value
 
-def draw_header(self, context):
-    layout: bpy.types.UILayout = self.layout
-    layout = layout.box()
-
-    row = layout.row(align=True)
-    pivot = row.operator(operator=ScaleGrid.bl_idname, text="", icon='OBJECT_ORIGIN')
-
-    formatted_scale = f"{context.space_data.overlay.grid_scale:.3f}"
-    formatted_scale = formatted_scale.rstrip('0').rstrip('.')
-    grid_text = f"{formatted_scale}{utility.unit()}"
-
-    row.ui_units_x = 6
-    row.menu(menu=GridPresetsMenu.bl_idname, text=grid_text, translate=False, icon='NONE')
-
-    decrement = row.operator(operator=ScaleGrid.bl_idname, text="", icon='REMOVE')
-    decrement.scale = 0.5
-
-    increment = row.operator(operator=ScaleGrid.bl_idname, text="", icon='ADD')
-    increment.scale = 2
-
 _addon_keymaps = []
 
 def add_scale_keymap(keymaps, key, scale):
@@ -58,7 +38,6 @@ def add_scale_keymap(keymaps, key, scale):
 def enable():
     bpy.utils.register_class(GridPresetsMenu)
     bpy.utils.register_class(ScaleGrid)
-    bpy.types.VIEW3D_HT_header.append(draw_header)
 
     wm = bpy.context.window_manager
     kc = wm.keyconfigs.addon
@@ -78,8 +57,6 @@ def disable():
         km.keymap_items.remove(kmi)
 
     _addon_keymaps.clear()
-    # bpy.types.VIEW3D_HT_header.remove(draw_header)
-    bpy.types.VIEW3D_HT_tool_header.remove(draw_header)
 
     bpy.utils.unregister_class(GridPresetsMenu)
     bpy.utils.unregister_class(ScaleGrid)
