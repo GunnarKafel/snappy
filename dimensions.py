@@ -241,9 +241,11 @@ def object_mode_overlay():
         end -= direction * growth_amount
         
         text = f"{axis.lower()}: {formatted}{unit}"
+
+        color = theme[axis]
         draw.text_3d(label_offset(start, end, cam_pos), text, (1,1,1,1), 12)
         
-        draw.lines([start, end], theme[axis])
+        draw.lines([start, end], color)
         
 # Registration
 

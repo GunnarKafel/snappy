@@ -9,5 +9,6 @@ def unit():
         'MICROMETERS': '?',
         'FEET': 'ft',
         'INCHES': 'in',
-        'MILES': 'mi'
+        'MILES': 'mi',
+        'ADAPTIVE': ""
     }[bpy.context.scene.unit_settings.length_unit]

@@ -94,7 +94,7 @@ def text_2d(point, text:str, color = (1,1,1,1), size = 14):
     pixel_instruction(draw)
     
 
-def text_3d(point, text: str, color = (1, 1, 1, 1), size = 14, padding = 4, background_color = (0.1, 0.1, 0.1, 0.5)):
+def text_3d(point, text: str, color = (1, 1, 1, 1), size = 14, padding = 4, background_color = (0.1, 0.1, 0.1, 0.4)):
     def draw():
         context = bpy.context
         region = context.region
