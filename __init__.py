@@ -1,9 +1,24 @@
-# Make sure to register all modules that way they refresh 
-from . import (dimensions, fly_camera, snapping, draw, utility, nudging, pivot, view3d_ui)
-modules = [fly_camera, dimensions, snapping, draw, utility, nudging, pivot, view3d_ui]
+import importlib
+import pkgutil
+from pathlib import Path
+
+def _load_modules():
+    package_root = Path(__file__).resolve().parent
+    modules_path = package_root / "modules"
+
+    discovered = []
+    for module_info in pkgutil.iter_modules([str(modules_path)]):
+        if module_info.name.startswith("_"):
+            continue
+        module = importlib.import_module(f".modules.{module_info.name}", __package__)
+        discovered.append(module)
+
+    return discovered
+
+
+modules = _load_modules()
 
 def hot_reload():
-    import importlib
     for module in modules:
         importlib.reload(module)
 
