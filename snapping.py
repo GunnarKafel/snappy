@@ -54,7 +54,7 @@ class GridPresetsMenu(bpy.types.Menu):
 
 class VIEW3D_MT_snap_target_pie_menu(bpy.types.Menu):
     bl_label = "Snap Target Pie Menu"
-    bl_idname = "VIEW3D_mt_snap_target_pie_menu"
+    bl_idname = "VIEW3D_MT_snap_target_pie_menu"
 
     def draw(self, context):
         layout = self.layout

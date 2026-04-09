@@ -1,6 +1,6 @@
 # Make sure to register all modules that way they refresh 
-from . import (dimensions, snapping, draw, utility, nudging, pivot, view3d_ui)
-modules = [dimensions, snapping, draw, utility, nudging, pivot, view3d_ui]
+from . import (fly, dimensions, snapping, draw, utility, nudging, pivot, view3d_ui)
+modules = [fly, dimensions, snapping, draw, utility, nudging, pivot, view3d_ui]
 
 def hot_reload():
     import importlib
