@@ -8,12 +8,13 @@ class VIEW3D_OT_hold_fly(bpy.types.Operator):
     bl_label = "Hold Fly Navigation"
     bl_options = {'BLOCKING', 'GRAB_CURSOR'}
 
-    _BASE_SPEED        = 18
+    _BASE_SPEED = 15
     _MOUSE_SENSITIVITY = 0.0015
-    _SPEED_SCALE       = 1.2
+    _SPEED_SCALE = 1.2
     _BOOST_MULTIPLIER  = 3.0
-    _MAX_PITCH         = math.radians(89)
-    _SMOOTHING         = 20.0  # higher = snappier, lower = floatier
+    _MAX_PITCH = math.radians(89)
+    _SMOOTHING = 20.0  
+    _EXIT_KEY = ["ESC", "LEFTMOUSE"]        
 
     # Pixels the mouse must travel before a click is treated as fly, not a context-menu click.
     _DRAG_THRESHOLD = 3
@@ -46,26 +47,30 @@ class VIEW3D_OT_hold_fly(bpy.types.Operator):
     def modal(self, context, event):
         rv3d = context.region_data
 
-        # --- Exit on RMB release ---
+        # Exit when we release right mouse button
         if event.type == 'RIGHTMOUSE' and event.value == 'RELEASE':
             self.finish(context)
             if self._total_drag < self._DRAG_THRESHOLD:
                 self._call_context_menu(context)
             return {'FINISHED'}
 
-        # --- Track key states ---
+        # Exit if we forcefully exit
+        if event.type in self._EXIT_KEY and event.value == 'PRESS':
+            self.finish(context)
+            return {'FINISHED'}
+            
+        # Keep track of input
         if event.value == 'PRESS':
             self._keys.add(event.type)
         elif event.value == 'RELEASE':
             self._keys.discard(event.type)
 
-        # --- Scroll to adjust fly speed ---
         if event.type == 'WHEELUPMOUSE':
             self._speed *= self._SPEED_SCALE
         elif event.type == 'WHEELDOWNMOUSE':
             self._speed /= self._SPEED_SCALE
 
-        # --- Mouse look — accumulate delta, apply on TIMER ---
+        # Store mouse look to be used in TIMER event
         if event.type == 'MOUSEMOVE':
             if self._mouse_prev is not None:
                 dx = event.mouse_region_x - self._mouse_prev[0]
@@ -76,7 +81,7 @@ class VIEW3D_OT_hold_fly(bpy.types.Operator):
 
             self._mouse_prev = (event.mouse_region_x, event.mouse_region_y)
 
-        # --- Apply rotation + movement together so redraws are never partial ---
+        # Apply frame
         if event.type == 'TIMER':
             now = time.perf_counter()
             dt = now - self._last_time
