@@ -25,10 +25,23 @@ class VIEW3D_OT_hold_fly(bpy.types.Operator):
         if self._area is None:
             return
 
-        effective = self._speed * (self._BOOST_MULTIPLIER if self._boost_active() else 1.0)
         self._area.header_text_set(
             f"Fly Speed: {self._speed:.2f}"
         )
+
+    def _call_context_menu(self, context):
+        mode_to_menu = {
+            'OBJECT': 'VIEW3D_MT_object_context_menu',
+            'EDIT_MESH': 'VIEW3D_MT_edit_mesh_context_menu',
+        }
+
+        menu_name = mode_to_menu.get(context.mode, 'VIEW3D_MT_object_context_menu')
+
+        # Fall back safely if a mode-specific menu is missing in a given Blender version.
+        if not hasattr(bpy.types, menu_name):
+            menu_name = 'VIEW3D_MT_object_context_menu'
+
+        bpy.ops.wm.call_menu(name=menu_name)
 
     def modal(self, context, event):
         rv3d = context.region_data
@@ -37,8 +50,7 @@ class VIEW3D_OT_hold_fly(bpy.types.Operator):
         if event.type == 'RIGHTMOUSE' and event.value == 'RELEASE':
             self.finish(context)
             if self._total_drag < self._DRAG_THRESHOLD:
-                # Didn't really drag — open the context menu instead.
-                bpy.ops.wm.call_menu(name='VIEW3D_MT_object_context_menu')
+                self._call_context_menu(context)
             return {'FINISHED'}
 
         # --- Track key states ---
@@ -75,7 +87,9 @@ class VIEW3D_OT_hold_fly(bpy.types.Operator):
                 self._mouse_delta = [0, 0]
             self.move_view(rv3d, dt)
 
-        self._update_header()
+        if self._total_drag >= self._DRAG_THRESHOLD:
+            self._update_header()
+
         self._area.tag_redraw()
         return {'RUNNING_MODAL'}
 
@@ -171,7 +185,6 @@ class VIEW3D_OT_hold_fly(bpy.types.Operator):
         wm = context.window_manager
         self._timer = wm.event_timer_add(0, window=context.window)
         wm.modal_handler_add(self)
-        self._update_header()
 
         return {'RUNNING_MODAL'}
 
@@ -197,14 +210,18 @@ def enable():
 
     if kc:
         km = kc.keymaps.new(name="Object Mode", space_type='EMPTY')
-
-        kmi = km.keymap_items.new(
+        addon_keymaps.append((km, km.keymap_items.new(
             VIEW3D_OT_hold_fly.bl_idname,
             type='RIGHTMOUSE',
             value='PRESS'
-        )
+        )))
 
-        addon_keymaps.append((km, kmi))
+        km = kc.keymaps.new(name="Mesh", space_type='EMPTY')
+        addon_keymaps.append((km, km.keymap_items.new(
+            VIEW3D_OT_hold_fly.bl_idname,
+            type='RIGHTMOUSE',
+            value='PRESS'
+        )))
 
 def disable():
     for km, kmi in addon_keymaps:
