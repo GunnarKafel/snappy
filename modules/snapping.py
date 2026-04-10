@@ -1,7 +1,7 @@
 import bpy
 from . import utility
 
-class SetSnapMode(bpy.types.Operator):
+class VIEW3D_OT_set_snap_mode(bpy.types.Operator):
     """Set active snapping mode"""
     bl_idname = "view3d.set_snap_mode"
     bl_label = "Set Snap Mode"
@@ -26,7 +26,7 @@ class SetSnapMode(bpy.types.Operator):
         self.report({'INFO'}, f"{self.mode.title()}")
         return {'FINISHED'}
 
-class ScaleGrid(bpy.types.Operator):
+class VIEW3D_OT_scale_grid(bpy.types.Operator):
     """Scale the grid by an amount"""
     
     bl_idname = "view3d.scale_grid"
@@ -38,7 +38,7 @@ class ScaleGrid(bpy.types.Operator):
         context.space_data.overlay.grid_scale *= self.scale
         return {'FINISHED'}
 
-class GridPresetsMenu(bpy.types.Menu):
+class VIEW3D_MT_grid_presets_menu(bpy.types.Menu):
     bl_idname = "VIEW3D_MT_grid_presets"
     bl_label = "Presets"
 
@@ -60,12 +60,12 @@ class VIEW3D_MT_snap_target_pie_menu(bpy.types.Menu):
         layout = self.layout
         pie = layout.menu_pie()
 
-        pie.operator(SetSnapMode.bl_idname, text="Grid", icon='SNAP_GRID').mode = 'GRID'
-        pie.operator(SetSnapMode.bl_idname, text="Face", icon='SNAP_FACE').mode = 'FACE'
-        pie.operator(SetSnapMode.bl_idname, text="Vertex", icon='SNAP_VERTEX').mode = 'VERTEX'
-        pie.operator(SetSnapMode.bl_idname, text="Edge", icon='SNAP_EDGE').mode = 'EDGE'
-        pie.operator(SetSnapMode.bl_idname, text="Increment", icon='SNAP_INCREMENT').mode = 'INCREMENT'
-        pie.operator(SetSnapMode.bl_idname, text="Volume", icon='SNAP_VOLUME').mode = 'VOLUME'
+        pie.operator(VIEW3D_OT_set_snap_mode.bl_idname, text="Grid", icon='SNAP_GRID').mode = 'GRID'
+        pie.operator(VIEW3D_OT_set_snap_mode.bl_idname, text="Face", icon='SNAP_FACE').mode = 'FACE'
+        pie.operator(VIEW3D_OT_set_snap_mode.bl_idname, text="Vertex", icon='SNAP_VERTEX').mode = 'VERTEX'
+        pie.operator(VIEW3D_OT_set_snap_mode.bl_idname, text="Edge", icon='SNAP_EDGE').mode = 'EDGE'
+        pie.operator(VIEW3D_OT_set_snap_mode.bl_idname, text="Increment", icon='SNAP_INCREMENT').mode = 'INCREMENT'
+        pie.operator(VIEW3D_OT_set_snap_mode.bl_idname, text="Volume", icon='SNAP_VOLUME').mode = 'VOLUME'
 
 class VIEW3D_OT_snap_target_pie(bpy.types.Operator):
     bl_idname = "view3d.snap_target_pie"
@@ -77,20 +77,20 @@ class VIEW3D_OT_snap_target_pie(bpy.types.Operator):
 
 _addon_keymaps = []
 
-def add_scale_keymap(keymaps, key, scale):
-    kmi = keymaps.keymap_items.new(ScaleGrid.bl_idname, key, 'PRESS', shift=False)
-    kmi.properties.scale = scale
-    return kmi
-
 classes = (
-    GridPresetsMenu,
-    ScaleGrid,
-    SetSnapMode,
+    VIEW3D_MT_grid_presets_menu,
+    VIEW3D_OT_scale_grid,
+    VIEW3D_OT_set_snap_mode,
     VIEW3D_MT_snap_target_pie_menu,
     VIEW3D_OT_snap_target_pie
 )
 
 def enable():
+    def add_scale_keymap(keymaps, key, scale):
+        kmi = keymaps.keymap_items.new(VIEW3D_OT_scale_grid.bl_idname, key, 'PRESS', shift=False)
+        kmi.properties.scale = scale
+        return kmi
+
     for cls in classes:
         bpy.utils.register_class(cls)
 

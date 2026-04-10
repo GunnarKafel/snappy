@@ -8,7 +8,7 @@ class VIEW3D_OT_hold_fly(bpy.types.Operator):
     bl_label = "Hold Fly Navigation"
     bl_options = {'BLOCKING', 'GRAB_CURSOR'}
 
-    _BASE_SPEED = 15
+    _BASE_SPEED = 10
     _MOUSE_SENSITIVITY = 0.0015
     _SPEED_SCALE = 1.2
     _BOOST_MULTIPLIER  = 3.0
@@ -161,14 +161,12 @@ class VIEW3D_OT_hold_fly(bpy.types.Operator):
             rv3d.view_location += self._velocity * dt
 
     def invoke(self, context, event):
-        # Only allow inside 3D viewport
         if context.area is None or context.area.type != 'VIEW_3D':
             return {'PASS_THROUGH'}
 
         if context.region_data is None:
             return {'CANCELLED'}
 
-        # Initialize per-invocation state (never use class-level mutable defaults)
         self._keys = set()
         self._timer = None
         self._speed = self._BASE_SPEED
@@ -177,14 +175,8 @@ class VIEW3D_OT_hold_fly(bpy.types.Operator):
         self._total_drag = 0
         self._velocity = Vector((0, 0, 0))
         self._last_time = time.perf_counter()
-        self._area = context.area  # cache: context.area is None during TIMER events
+        self._area = context.area 
 
-        # Collapse the orbit pivot onto the camera eye so that movement
-        # translates the eye directly. view_distance is left unchanged so
-        # Blender's zoom remains fully functional after exiting.
-        rv3d = context.region_data
-
-        # Capture cursor (prevents UI interaction)
         context.window.cursor_modal_set('NONE')
 
         wm = context.window_manager

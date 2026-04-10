@@ -1,6 +1,6 @@
 import bpy
 
-class OriginSelectPanel(bpy.types.Panel):
+class VIEW3D_PT_origin_select(bpy.types.Panel):
     bl_idname = "VIEW3D_PT_origin_select"
     bl_label = "Select Origin"
     bl_space_type = 'VIEW_3D'
@@ -11,7 +11,7 @@ class OriginSelectPanel(bpy.types.Panel):
         self.layout.label(text="Origin Select")
 
 def enable():
-    bpy.utils.register_class(OriginSelectPanel)
+    bpy.utils.register_class(VIEW3D_PT_origin_select)
 
 def disable():
-    bpy.utils.unregister_class(OriginSelectPanel)
+    bpy.utils.unregister_class(VIEW3D_PT_origin_select)

@@ -9,12 +9,12 @@ def draw_grid_ui(layout, context):
 
     row = layout.row(align=True)
     row.ui_units_x = 5
-    row.menu(menu=snapping.GridPresetsMenu.bl_idname, text=grid_text, translate=False, icon='NONE')
+    row.menu(menu=snapping.VIEW3D_MT_grid_presets_menu.bl_idname, text=grid_text, translate=False, icon='NONE')
 
-    decrement = row.operator(operator=snapping.ScaleGrid.bl_idname, text="", icon='REMOVE')
+    decrement = row.operator(operator=snapping.VIEW3D_OT_scale_grid.bl_idname, text="", icon='REMOVE')
     decrement.scale = 0.5
 
-    increment = row.operator(operator=snapping.ScaleGrid.bl_idname, text="", icon='ADD')
+    increment = row.operator(operator=snapping.VIEW3D_OT_scale_grid.bl_idname, text="", icon='ADD')
     increment.scale = 2
 
 
