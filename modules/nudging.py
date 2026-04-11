@@ -2,7 +2,7 @@ import bpy
 import mathutils as math
 
 #Nudge relative to the camera with arrow keys
-class NudgeSelected(bpy.types.Operator):
+class VIEW3D_OT_nudge_selected(bpy.types.Operator):
     bl_idname = "view3d.nudge_selected"
     bl_label = "Nudge Selected"
     nudge_options: bpy.props.EnumProperty(
@@ -78,19 +78,19 @@ class NudgeSelected(bpy.types.Operator):
 
 _addon_keymaps = []
 def define_nudge_keymap(km, key, option):
-        kmi = km.keymap_items.new(NudgeSelected.bl_idname, type=key, value="PRESS")
+        kmi = km.keymap_items.new(VIEW3D_OT_nudge_selected.bl_idname, type=key, value="PRESS")
         kmi.properties.nudge_options = option
         kmi.properties.nudge_extrude = False
         _addon_keymaps.append((km, kmi))
 
-        kmi = km.keymap_items.new(NudgeSelected.bl_idname, type=key, value="PRESS")
+        kmi = km.keymap_items.new(VIEW3D_OT_nudge_selected.bl_idname, type=key, value="PRESS")
         kmi.properties.nudge_options = option
         kmi.properties.nudge_extrude = True
         kmi.shift = True
         _addon_keymaps.append((km, kmi))
 
 def enable():
-    bpy.utils.register_class(NudgeSelected)
+    bpy.utils.register_class(VIEW3D_OT_nudge_selected)
 
     wm = bpy.context.window_manager
     kc = wm.keyconfigs.addon
@@ -118,7 +118,7 @@ def disable():
         km.keymap_items.remove(kmi)
 
     _addon_keymaps.clear()
-    bpy.utils.unregister_class(NudgeSelected)
+    bpy.utils.unregister_class(VIEW3D_OT_nudge_selected)
 
     
 def get_view_axes():
